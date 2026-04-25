@@ -1,6 +1,10 @@
-FROM openenv-base:latest
+FROM python:3.11-slim
 
 WORKDIR /app
+
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends curl git && \
+    rm -rf /var/lib/apt/lists/*
 
 # Copy the package source (build context is neuro_rl_env/)
 COPY . /app/
