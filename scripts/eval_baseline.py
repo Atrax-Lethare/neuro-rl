@@ -4,7 +4,8 @@ Usage (Docker / local):
     python scripts/eval_baseline.py
 
 Outputs:
-    outputs/baseline_metrics.json   — accuracy table (overall, per-intent, per-drift)
+    outputs/baseline_metrics.json           — accuracy table (overall, per-intent, per-drift)
+    outputs/baseline_drift_resistance.json  — 30-point drift sweep for intent=move_left
 
 Expected ballpark: 10-20% (random guess on 7 classes is ~14%).
 
@@ -28,7 +29,6 @@ import numpy as np
 import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
-# Ensure project root is importable regardless of working directory
 _ROOT = Path(__file__).parent.parent
 sys.path.insert(0, str(_ROOT))
 sys.path.insert(0, str(Path(__file__).parent))  # for heldout_scenarios
@@ -37,6 +37,12 @@ from neuro_rl_env.server.signal import generate_spike_train
 from heldout_scenarios import DRIFT_PHASES, HELD_OUT_SCENARIOS
 
 MODEL_NAME = os.environ.get("EVAL_MODEL", "Qwen/Qwen3-1.7B-Instruct")
+
+# Drift-resistance sweep parameters (mirrors eval_trained.py)
+DRIFT_SWEEP_INTENT = "move_left"
+DRIFT_SWEEP_NOISE = 25.0
+DRIFT_SWEEP_N_PHASES = 30
+DRIFT_SWEEP_EPISODES_PER_PHASE = 20
 
 # ---------------------------------------------------------------------------
 # Prompt template — identical to training (train_grpo.py Cell 4)
@@ -81,9 +87,7 @@ def make_prompt(obs_dict: dict) -> str:
 
 def parse_intent(text: str) -> str:
     """Extract intent from raw model output. Returns 'rest' on any parse failure."""
-    # Strip <think>…</think> block
     cleaned = re.sub(r"<think>.*?</think>", "", text, flags=re.DOTALL).strip()
-    # Find first JSON object
     m = re.search(r"\{.*?\}", cleaned, re.DOTALL)
     if m:
         try:
@@ -91,9 +95,27 @@ def parse_intent(text: str) -> str:
             return str(data.get("intent", "rest"))
         except json.JSONDecodeError:
             pass
-    # Fallback: regex hunt for intent field anywhere in the output
     m2 = re.search(r'"intent"\s*:\s*"([^"]+)"', text)
     return m2.group(1) if m2 else "rest"
+
+
+# ---------------------------------------------------------------------------
+# Inference helper
+# ---------------------------------------------------------------------------
+
+def infer_intent(model, tokenizer, device: str, obs_dict: dict) -> tuple[str, str]:
+    prompt = make_prompt(obs_dict)
+    inputs = tokenizer(prompt, return_tensors="pt").to(device)
+    with torch.no_grad():
+        output_ids = model.generate(
+            **inputs,
+            max_new_tokens=512,
+            do_sample=False,
+            pad_token_id=tokenizer.eos_token_id,
+        )
+    new_tokens = output_ids[0][inputs["input_ids"].shape[1]:]
+    response = tokenizer.decode(new_tokens, skip_special_tokens=True)
+    return parse_intent(response), response
 
 
 # ---------------------------------------------------------------------------
@@ -122,19 +144,16 @@ def load_model(model_name: str):
 
 
 # ---------------------------------------------------------------------------
-# Evaluation loop
+# Main evaluation — held-out scenario pool
 # ---------------------------------------------------------------------------
 
-def run_eval() -> dict:
-    model, tokenizer, device = load_model(MODEL_NAME)
-
+def run_eval(model, tokenizer, device: str) -> dict:
     total = len(HELD_OUT_SCENARIOS)
     correct = 0
     intent_stats: dict[str, dict] = {}
     drift_stats: dict[str, dict] = {}
     results: list[dict] = []
 
-    # Human-readable labels for the three held-out drift phases
     drift_labels = {f"{d:.6f}": lbl for d, lbl in zip(DRIFT_PHASES, ["π/4", "3π/4", "5π/4"])}
 
     print(f"Evaluating {total} held-out scenarios with {MODEL_NAME}\n")
@@ -146,7 +165,6 @@ def run_eval() -> dict:
         noise_level: float = scenario["noise_level"]
         drift_phase: float = scenario["drift_phase"]
 
-        # Fixed seed per scenario for reproducibility across runs
         rng = np.random.default_rng(seed=idx)
         _, mean_firing_rates, _ = generate_spike_train(
             intent=intent,
@@ -160,33 +178,18 @@ def run_eval() -> dict:
             "drift_phase": drift_phase,
             "noise_level": noise_level,
         }
-        prompt = make_prompt(obs_dict)
 
-        inputs = tokenizer(prompt, return_tensors="pt").to(device)
-        with torch.no_grad():
-            output_ids = model.generate(
-                **inputs,
-                max_new_tokens=512,
-                do_sample=False,
-                pad_token_id=tokenizer.eos_token_id,
-            )
-
-        new_tokens = output_ids[0][inputs["input_ids"].shape[1]:]
-        response = tokenizer.decode(new_tokens, skip_special_tokens=True)
-
-        predicted = parse_intent(response)
+        predicted, response = infer_intent(model, tokenizer, device, obs_dict)
         ok = predicted == intent
         if ok:
             correct += 1
 
-        # Per-intent bookkeeping
         if intent not in intent_stats:
             intent_stats[intent] = {"correct": 0, "total": 0}
         intent_stats[intent]["total"] += 1
         if ok:
             intent_stats[intent]["correct"] += 1
 
-        # Per-drift-phase bookkeeping (keyed by 6-decimal string for JSON)
         dk = f"{drift_phase:.6f}"
         if dk not in drift_stats:
             drift_stats[dk] = {"correct": 0, "total": 0, "label": drift_labels.get(dk, dk)}
@@ -207,9 +210,6 @@ def run_eval() -> dict:
             "response_snippet": response[:300],
         })
 
-    # -----------------------------------------------------------------------
-    # Metrics summary
-    # -----------------------------------------------------------------------
     overall_accuracy = correct / total
 
     metrics = {
@@ -231,18 +231,12 @@ def run_eval() -> dict:
         "results": results,
     }
 
-    # -----------------------------------------------------------------------
-    # Save outputs/baseline_metrics.json
-    # -----------------------------------------------------------------------
     outputs_dir = _ROOT / "outputs"
     outputs_dir.mkdir(exist_ok=True)
     out_path = outputs_dir / "baseline_metrics.json"
     with open(out_path, "w") as fh:
         json.dump(metrics, fh, indent=2)
 
-    # -----------------------------------------------------------------------
-    # Printed table
-    # -----------------------------------------------------------------------
     print("\n" + "=" * 60)
     print(f"BASELINE  —  untrained {MODEL_NAME}")
     print("=" * 60)
@@ -266,5 +260,80 @@ def run_eval() -> dict:
     return metrics
 
 
+# ---------------------------------------------------------------------------
+# Drift-resistance sweep (same parameters as eval_trained.py)
+# ---------------------------------------------------------------------------
+
+def run_drift_sweep(model, tokenizer, device: str) -> list[dict]:
+    """Sweep drift_phase 0→2π in 30 steps; 20 episodes each; intent fixed to move_left.
+
+    Returns a list of 30 dicts. Saved to outputs/baseline_drift_resistance.json.
+    """
+    phases = np.linspace(0, 2 * pi, DRIFT_SWEEP_N_PHASES, endpoint=False).tolist()
+
+    print(f"\n{'=' * 60}")
+    print(f"DRIFT-RESISTANCE SWEEP  —  intent={DRIFT_SWEEP_INTENT}  noise={DRIFT_SWEEP_NOISE}")
+    print(f"  {DRIFT_SWEEP_N_PHASES} phases × {DRIFT_SWEEP_EPISODES_PER_PHASE} episodes each")
+    print("=" * 60)
+    print(f"{'Phase (rad)':>12}  {'Phase/π':>8}  {'Acc':>6}  (n)")
+    print("-" * 40)
+
+    sweep_results: list[dict] = []
+
+    for phase_idx, drift_phase in enumerate(phases):
+        ep_correct = 0
+        for ep in range(DRIFT_SWEEP_EPISODES_PER_PHASE):
+            rng = np.random.default_rng(seed=phase_idx * DRIFT_SWEEP_EPISODES_PER_PHASE + ep)
+            _, mean_firing_rates, _ = generate_spike_train(
+                intent=DRIFT_SWEEP_INTENT,
+                noise_level=DRIFT_SWEEP_NOISE,
+                drift_phase=drift_phase,
+                rng=rng,
+            )
+            obs_dict = {
+                "mean_firing_rates": mean_firing_rates,
+                "drift_phase": drift_phase,
+                "noise_level": DRIFT_SWEEP_NOISE,
+            }
+            predicted, _ = infer_intent(model, tokenizer, device, obs_dict)
+            if predicted == DRIFT_SWEEP_INTENT:
+                ep_correct += 1
+
+        accuracy = ep_correct / DRIFT_SWEEP_EPISODES_PER_PHASE
+        phase_label = f"{drift_phase / pi:.3f}π"
+        print(f"  {drift_phase:12.6f}  {phase_label:>8}  {accuracy:6.1%}  ({ep_correct}/{DRIFT_SWEEP_EPISODES_PER_PHASE})")
+
+        sweep_results.append({
+            "drift_phase": drift_phase,
+            "phase_label": phase_label,
+            "accuracy": accuracy,
+            "correct": ep_correct,
+            "total": DRIFT_SWEEP_EPISODES_PER_PHASE,
+        })
+
+    outputs_dir = _ROOT / "outputs"
+    outputs_dir.mkdir(exist_ok=True)
+    out_path = outputs_dir / "baseline_drift_resistance.json"
+    with open(out_path, "w") as fh:
+        json.dump(
+            {
+                "intent": DRIFT_SWEEP_INTENT,
+                "noise_level": DRIFT_SWEEP_NOISE,
+                "n_phases": DRIFT_SWEEP_N_PHASES,
+                "episodes_per_phase": DRIFT_SWEEP_EPISODES_PER_PHASE,
+                "sweep": sweep_results,
+            },
+            fh,
+            indent=2,
+        )
+
+    mean_acc = sum(r["accuracy"] for r in sweep_results) / len(sweep_results)
+    print(f"\nMean drift-sweep accuracy: {mean_acc:.1%}")
+    print(f"Saved → {out_path}")
+    return sweep_results
+
+
 if __name__ == "__main__":
-    run_eval()
+    model, tokenizer, device = load_model(MODEL_NAME)
+    run_eval(model, tokenizer, device)
+    run_drift_sweep(model, tokenizer, device)
