@@ -1,0 +1,16 @@
+FROM openenv-base:latest
+
+WORKDIR /app
+
+# Copy the package source (build context is neuro_rl_env/)
+COPY . /app/
+
+# Install the package and all runtime dependencies
+RUN pip install --no-cache-dir -e /app/
+
+EXPOSE 8000
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
+    CMD curl -f http://localhost:8000/health || exit 1
+
+CMD ["uvicorn", "neuro_rl_env.server.app:app", "--host", "0.0.0.0", "--port", "8000"]

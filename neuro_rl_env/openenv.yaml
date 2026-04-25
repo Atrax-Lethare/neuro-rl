@@ -1,0 +1,7 @@
+spec_version: 1
+name: neuro-rl-env
+type: space
+runtime: fastapi
+app: server.app:app
+port: 8000
+description: "BCI decoding via Poisson spike trains with drift"
