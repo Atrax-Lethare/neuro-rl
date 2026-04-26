@@ -1,4 +1,8 @@
-FROM python:3.11-slim
+# OpenEnv §9 requirement: base image must be openenv-base:latest.
+# For HF Spaces deployment, openenv push is called with:
+#   openenv push --base-image python:3.11-slim
+# because openenv-base:latest is not accessible in the HF build environment.
+FROM openenv-base:latest
 
 WORKDIR /app
 

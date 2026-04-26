@@ -255,6 +255,7 @@ def plot_accuracy_comparison() -> None:
         fontsize=10, color=_RED,
     )
 
+    ax.set_xlabel("Model variant")
     ax.set_ylabel("Held-out accuracy (%)")
     ax.set_ylim(0, max(values) * 1.18)
     ax.yaxis.set_major_formatter(mticker.PercentFormatter(xmax=100))

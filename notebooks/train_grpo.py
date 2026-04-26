@@ -16,8 +16,16 @@ import subprocess, os, sys
 
 KAGGLE = os.path.exists("/kaggle")
 
-if not KAGGLE:
-    # Core ML stack
+if KAGGLE:
+    # On Kaggle: install neuro-rl-env from the live HF Space
+    # (core ML packages are pre-installed on Kaggle T4 instances)
+    subprocess.run(
+        [sys.executable, "-m", "pip", "install", "-q",
+         "git+https://huggingface.co/spaces/abhishekBiradar/neuro-rl-env"],
+        check=False,
+    )
+else:
+    # Core ML stack (local / Colab)
     subprocess.run(
         [sys.executable, "-m", "pip", "install", "-q",
          "unsloth==2025.*", "trl==1.1.*", "transformers", "accelerate", "peft", "datasets"],
@@ -27,16 +35,19 @@ if not KAGGLE:
         [sys.executable, "-m", "pip", "install", "-q", "wandb"],
         check=False,
     )
-    # HF Space install (replace <USERNAME> when the Space is deployed):
-    # subprocess.run([sys.executable, "-m", "pip", "install", "-q",
-    #     "git+https://huggingface.co/spaces/<USERNAME>/neuro-rl-env"], check=False)
-    #
-    # Local development install (used for the smoke test):
-    subprocess.run(
-        [sys.executable, "-m", "pip", "install", "-q", "-e",
-         os.path.join(os.path.dirname(os.path.dirname(__file__)), "neuro_rl_env")],
+    # Install neuro-rl-env — prefer HF Space source; fall back to local editable install
+    _hf_install = subprocess.run(
+        [sys.executable, "-m", "pip", "install", "-q",
+         "git+https://huggingface.co/spaces/abhishekBiradar/neuro-rl-env"],
         check=False,
     )
+    if _hf_install.returncode != 0:
+        # Local development fallback (smoke tests without network)
+        subprocess.run(
+            [sys.executable, "-m", "pip", "install", "-q", "-e",
+             os.path.join(os.path.dirname(os.path.dirname(__file__)), "neuro_rl_env")],
+            check=False,
+        )
 
 # Windows: ensure UTF-8 mode so trl's Jinja templates load correctly.
 # (Has no effect on Linux/Kaggle; harmless on Mac.)
