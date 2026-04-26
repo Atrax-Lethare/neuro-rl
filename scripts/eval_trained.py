@@ -21,24 +21,49 @@ from __future__ import annotations
 
 import json
 import os
+import random
 import re
 import sys
 from math import pi
 from pathlib import Path
+
+# Ensure UTF-8 output on Windows before any print calls
+os.environ.setdefault("PYTHONUTF8", "1")
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8")
+if hasattr(sys.stderr, "reconfigure"):
+    sys.stderr.reconfigure(encoding="utf-8")
+
+_ROOT = Path(__file__).parent.parent
+sys.path.insert(0, str(_ROOT))
+sys.path.insert(0, str(Path(__file__).parent))  # for heldout_scenarios
+
+# Load .env and authenticate with HuggingFace
+try:
+    from dotenv import load_dotenv
+    load_dotenv(_ROOT / ".env")
+except ImportError:
+    pass
+
+_hf_token = os.environ.get("HF_TOKEN", "")
+if _hf_token:
+    try:
+        from huggingface_hub import login
+        login(token=_hf_token, add_to_git_credential=False)
+    except Exception:
+        pass
 
 import numpy as np
 import torch
 from peft import PeftModel
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
-_ROOT = Path(__file__).parent.parent
-sys.path.insert(0, str(_ROOT))
-sys.path.insert(0, str(Path(__file__).parent))  # for heldout_scenarios
-
+from neuro_rl_env.models import INTENTS
 from neuro_rl_env.server.signal import generate_spike_train
 from heldout_scenarios import DRIFT_PHASES, HELD_OUT_SCENARIOS
 
 BASE_MODEL_NAME = os.environ.get("EVAL_BASE_MODEL", "Qwen/Qwen3-1.7B-Instruct")
+NO_MODEL = os.environ.get("NEURO_RL_NO_MODEL", "0") == "1"
 
 _hf_user = os.environ.get("HF_USER", "")
 ADAPTER_REPO = os.environ.get("ADAPTER_REPO", f"{_hf_user}/neuro-rl-adapter" if _hf_user else "")
@@ -109,6 +134,8 @@ def parse_intent(text: str) -> str:
 # ---------------------------------------------------------------------------
 
 def infer_intent(model, tokenizer, device: str, obs_dict: dict) -> str:
+    if model is None:
+        return random.choice(INTENTS), ""
     prompt = make_prompt(obs_dict)
     inputs = tokenizer(prompt, return_tensors="pt").to(device)
     with torch.no_grad():
@@ -128,6 +155,9 @@ def infer_intent(model, tokenizer, device: str, obs_dict: dict) -> str:
 # ---------------------------------------------------------------------------
 
 def load_model_with_adapter(base_model_name: str, adapter_repo: str):
+    if NO_MODEL:
+        print("NEURO_RL_NO_MODEL=1 — skipping model load, using random predictions")
+        return None, None, "cpu"
     if not adapter_repo:
         raise SystemExit(
             "ERROR: adapter repo not set.\n"
@@ -217,7 +247,7 @@ def run_eval(model, tokenizer, device: str) -> dict:
 
         print(
             f"{idx + 1:3d}  {intent:<12}  {noise_level:6.1f}  {drift_phase:8.4f}"
-            f"  {predicted:<12}  {'✓' if ok else '✗'}"
+            f"  {predicted:<12}  {'OK' if ok else '--'}"
         )
 
         results.append({

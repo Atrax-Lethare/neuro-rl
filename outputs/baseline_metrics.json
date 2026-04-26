@@ -1,0 +1,300 @@
+{
+  "model": "Qwen/Qwen3-1.7B-Instruct",
+  "overall_accuracy": 0.14285714285714285,
+  "correct": 3,
+  "total": 21,
+  "per_intent_accuracy": {
+    "move_left": 0.0,
+    "move_right": 0.0,
+    "move_up": 0.0,
+    "move_down": 0.6666666666666666,
+    "grasp": 0.0,
+    "release": 0.0,
+    "rest": 0.3333333333333333
+  },
+  "per_intent_counts": {
+    "move_left": {
+      "correct": 0,
+      "total": 3
+    },
+    "move_right": {
+      "correct": 0,
+      "total": 3
+    },
+    "move_up": {
+      "correct": 0,
+      "total": 3
+    },
+    "move_down": {
+      "correct": 2,
+      "total": 3
+    },
+    "grasp": {
+      "correct": 0,
+      "total": 3
+    },
+    "release": {
+      "correct": 0,
+      "total": 3
+    },
+    "rest": {
+      "correct": 1,
+      "total": 3
+    }
+  },
+  "per_drift_phase_accuracy": {
+    "\u03c0/4": 0.2857142857142857,
+    "3\u03c0/4": 0.14285714285714285,
+    "5\u03c0/4": 0.0
+  },
+  "per_drift_phase_counts": {
+    "\u03c0/4": {
+      "correct": 2,
+      "total": 7,
+      "label": "\u03c0/4"
+    },
+    "3\u03c0/4": {
+      "correct": 1,
+      "total": 7,
+      "label": "3\u03c0/4"
+    },
+    "5\u03c0/4": {
+      "correct": 0,
+      "total": 7,
+      "label": "5\u03c0/4"
+    }
+  },
+  "results": [
+    {
+      "index": 0,
+      "scenario": {
+        "intent": "move_left",
+        "noise_level": 10.0,
+        "drift_phase": 0.7853981633974483
+      },
+      "predicted_intent": "grasp",
+      "correct": false,
+      "response_snippet": ""
+    },
+    {
+      "index": 1,
+      "scenario": {
+        "intent": "move_left",
+        "noise_level": 50.0,
+        "drift_phase": 2.356194490192345
+      },
+      "predicted_intent": "rest",
+      "correct": false,
+      "response_snippet": ""
+    },
+    {
+      "index": 2,
+      "scenario": {
+        "intent": "move_left",
+        "noise_level": 80.0,
+        "drift_phase": 3.9269908169872414
+      },
+      "predicted_intent": "grasp",
+      "correct": false,
+      "response_snippet": ""
+    },
+    {
+      "index": 3,
+      "scenario": {
+        "intent": "move_right",
+        "noise_level": 10.0,
+        "drift_phase": 0.7853981633974483
+      },
+      "predicted_intent": "release",
+      "correct": false,
+      "response_snippet": ""
+    },
+    {
+      "index": 4,
+      "scenario": {
+        "intent": "move_right",
+        "noise_level": 50.0,
+        "drift_phase": 2.356194490192345
+      },
+      "predicted_intent": "move_up",
+      "correct": false,
+      "response_snippet": ""
+    },
+    {
+      "index": 5,
+      "scenario": {
+        "intent": "move_right",
+        "noise_level": 80.0,
+        "drift_phase": 3.9269908169872414
+      },
+      "predicted_intent": "rest",
+      "correct": false,
+      "response_snippet": ""
+    },
+    {
+      "index": 6,
+      "scenario": {
+        "intent": "move_up",
+        "noise_level": 10.0,
+        "drift_phase": 0.7853981633974483
+      },
+      "predicted_intent": "move_left",
+      "correct": false,
+      "response_snippet": ""
+    },
+    {
+      "index": 7,
+      "scenario": {
+        "intent": "move_up",
+        "noise_level": 50.0,
+        "drift_phase": 2.356194490192345
+      },
+      "predicted_intent": "move_right",
+      "correct": false,
+      "response_snippet": ""
+    },
+    {
+      "index": 8,
+      "scenario": {
+        "intent": "move_up",
+        "noise_level": 80.0,
+        "drift_phase": 3.9269908169872414
+      },
+      "predicted_intent": "move_right",
+      "correct": false,
+      "response_snippet": ""
+    },
+    {
+      "index": 9,
+      "scenario": {
+        "intent": "move_down",
+        "noise_level": 10.0,
+        "drift_phase": 0.7853981633974483
+      },
+      "predicted_intent": "move_down",
+      "correct": true,
+      "response_snippet": ""
+    },
+    {
+      "index": 10,
+      "scenario": {
+        "intent": "move_down",
+        "noise_level": 50.0,
+        "drift_phase": 2.356194490192345
+      },
+      "predicted_intent": "move_down",
+      "correct": true,
+      "response_snippet": ""
+    },
+    {
+      "index": 11,
+      "scenario": {
+        "intent": "move_down",
+        "noise_level": 80.0,
+        "drift_phase": 3.9269908169872414
+      },
+      "predicted_intent": "move_left",
+      "correct": false,
+      "response_snippet": ""
+    },
+    {
+      "index": 12,
+      "scenario": {
+        "intent": "grasp",
+        "noise_level": 10.0,
+        "drift_phase": 0.7853981633974483
+      },
+      "predicted_intent": "rest",
+      "correct": false,
+      "response_snippet": ""
+    },
+    {
+      "index": 13,
+      "scenario": {
+        "intent": "grasp",
+        "noise_level": 50.0,
+        "drift_phase": 2.356194490192345
+      },
+      "predicted_intent": "move_down",
+      "correct": false,
+      "response_snippet": ""
+    },
+    {
+      "index": 14,
+      "scenario": {
+        "intent": "grasp",
+        "noise_level": 80.0,
+        "drift_phase": 3.9269908169872414
+      },
+      "predicted_intent": "rest",
+      "correct": false,
+      "response_snippet": ""
+    },
+    {
+      "index": 15,
+      "scenario": {
+        "intent": "release",
+        "noise_level": 10.0,
+        "drift_phase": 0.7853981633974483
+      },
+      "predicted_intent": "move_down",
+      "correct": false,
+      "response_snippet": ""
+    },
+    {
+      "index": 16,
+      "scenario": {
+        "intent": "release",
+        "noise_level": 50.0,
+        "drift_phase": 2.356194490192345
+      },
+      "predicted_intent": "move_down",
+      "correct": false,
+      "response_snippet": ""
+    },
+    {
+      "index": 17,
+      "scenario": {
+        "intent": "release",
+        "noise_level": 80.0,
+        "drift_phase": 3.9269908169872414
+      },
+      "predicted_intent": "rest",
+      "correct": false,
+      "response_snippet": ""
+    },
+    {
+      "index": 18,
+      "scenario": {
+        "intent": "rest",
+        "noise_level": 10.0,
+        "drift_phase": 0.7853981633974483
+      },
+      "predicted_intent": "rest",
+      "correct": true,
+      "response_snippet": ""
+    },
+    {
+      "index": 19,
+      "scenario": {
+        "intent": "rest",
+        "noise_level": 50.0,
+        "drift_phase": 2.356194490192345
+      },
+      "predicted_intent": "move_up",
+      "correct": false,
+      "response_snippet": ""
+    },
+    {
+      "index": 20,
+      "scenario": {
+        "intent": "rest",
+        "noise_level": 80.0,
+        "drift_phase": 3.9269908169872414
+      },
+      "predicted_intent": "move_right",
+      "correct": false,
+      "response_snippet": ""
+    }
+  ]
+}
