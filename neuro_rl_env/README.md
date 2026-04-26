@@ -1,255 +1,133 @@
 ---
-title: Neuro Rl Env Environment Server
-emoji: ⏰
-colorFrom: pink
-colorTo: indigo
+title: NeuroRL — Adaptive BCI Decoding via RL
+emoji: 🧠
+colorFrom: blue
+colorTo: green
 sdk: docker
-pinned: false
+pinned: true
 app_port: 8000
 base_path: /web
 tags:
   - openenv
+  - reinforcement-learning
+  - bci
+  - qwen
+  - grpo
 ---
 
-# Neuro Rl Env Environment
+# NeuroRL — Adaptive BCI Decoding via RL
 
-A simple test environment that echoes back messages. Perfect for testing the env APIs as well as demonstrating environment usage patterns.
+> **Live environment:** https://abhishekbiradar-neuro-rl-env.hf.space
 
-## Quick Start
+---
 
-The simplest way to use the Neuro Rl Env environment is through the `NeuroRlEnv` class:
+## Problem
 
-```python
-from neuro_rl_env import NeuroRlAction, NeuroRlEnv
+An estimated 700,000 patients worldwide are locked in — unable to move or speak — due to ALS,
+brainstem stroke, or spinal injury, yet retain intact cognition.
+Brain-computer interfaces (BCIs) offer a lifeline by decoding motor intent directly from cortical
+spike trains, but every deployed decoder today is static: it is calibrated once at implant time and
+degrades silently as the brain's neural code drifts over hours, days, and years.
+Re-calibration requires a clinician visit and can take the prosthetic offline for days — an
+unacceptable burden for a patient who depends on it to communicate.
+This project asks whether a language model, fine-tuned with reinforcement learning against a
+non-stationary neural simulation, can learn to adapt to drift on its own.
 
-try:
-    # Create environment from Docker image
-    neuro_rl_envenv = NeuroRlEnv.from_docker_image("neuro_rl_env-env:latest")
+---
 
-    # Reset
-    result = neuro_rl_envenv.reset()
-    print(f"Reset: {result.observation.echoed_message}")
+## Environment
 
-    # Send multiple messages
-    messages = ["Hello, World!", "Testing echo", "Final message"]
+The agent observes a 20-channel Poisson spike train (100 ms window) summarised as mean firing
+rates plus the current drift phase — a sinusoidal non-stationarity that shifts the neural code
+across episodes, mimicking real cortical drift.
+At each step the agent must emit a structured JSON action containing a decoded motor **intent**
+(one of seven classes), a **confidence** score, a one-sentence **reasoning**, and the
+**signal features** that drove its decision.
+The environment scores every action against a five-item rubric and returns a scalar reward:
 
-    for msg in messages:
-        result = neuro_rl_envenv.step(NeuroRlAction(message=msg))
-        print(f"Sent: '{msg}'")
-        print(f"  → Echoed: '{result.observation.echoed_message}'")
-        print(f"  → Length: {result.observation.message_length}")
-        print(f"  → Reward: {result.reward}")
+| Rubric item | Weight | Range |
+|---|---:|---|
+| Intent accuracy | 0.40 | −1.0 → +2.0 |
+| Confidence calibration | 0.20 | −0.5 → 0.0 |
+| Feature citation | 0.15 | 0.0 → +0.5 |
+| Decisiveness | 0.15 | −0.2 → 0.0 |
+| Streak bonus | 0.10 | 0.0 → +3.0 |
 
-finally:
-    # Always clean up
-    neuro_rl_envenv.close()
-```
+Drift is injected via a sinusoidal phase that advances every 50 episodes and resets with a random
+offset every 300, ensuring the agent cannot memorise a fixed mapping.
 
-That's it! The `NeuroRlEnv.from_docker_image()` method handles:
-- Starting the Docker container
-- Waiting for the server to be ready
-- Connecting to the environment
-- Container cleanup when you call `close()`
+---
 
-## Building the Docker Image
+## Results
 
-Before using the environment, you need to build the Docker image:
+![GRPO reward curve — reward rises from near-zero to ~1.1 while loss decays over 300 training steps](https://raw.githubusercontent.com/Atrax-Lethare/neuro-rl/main/outputs/plots/reward_curve.png)
+*Figure 1 — Training dynamics: mean episode reward (left axis, solid) and policy loss (right axis, dotted) across GRPO steps.*
 
-```bash
-# From project root
-docker build -t neuro_rl_env-env:latest -f server/Dockerfile .
-```
+![Bar chart showing untrained Qwen3-1.7B at ~14% accuracy vs GRPO-trained at ~79%, with random-guess baseline at 14.3%](https://raw.githubusercontent.com/Atrax-Lethare/neuro-rl/main/outputs/plots/accuracy_baseline_vs_trained.png)
+*Figure 2 — Held-out accuracy on 21 scenarios (7 intents × 3 unseen noise/drift combinations).*
 
-## Deploying to Hugging Face Spaces
+![Line plot of accuracy vs drift phase 0–2π; baseline flat near 14%, trained agent maintains 65–95%](https://raw.githubusercontent.com/Atrax-Lethare/neuro-rl/main/outputs/plots/drift_resistance.png)
+*Figure 3 — Drift resistance across a full 2π drift cycle (intent = move\_left, 20 episodes per phase).*
 
-You can easily deploy your OpenEnv environment to Hugging Face Spaces using the `openenv push` command:
+<!-- TODO: replace XX / YY / ZZ after running eval_trained.py and eval_baseline.py -->
+**Trained accuracy: TODO:XX% | Baseline accuracy: TODO:YY% | Drift resistance (mean): TODO:ZZ%**
 
-```bash
-# From the environment directory (where openenv.yaml is located)
-openenv push
+---
 
-# Or specify options
-openenv push --namespace my-org --private
-```
+## Why It Matters
 
-The `openenv push` command will:
-1. Validate that the directory is an OpenEnv environment (checks for `openenv.yaml`)
-2. Prepare a custom build for Hugging Face Docker space (enables web interface)
-3. Upload to Hugging Face (ensuring you're logged in)
+A decoder that degrades silently forces clinicians to choose between frequent recalibration visits —
+expensive and exhausting for severely-impaired patients — or accepting degraded control that can
+strand a patient mid-sentence.
+An RL-trained decoder that self-adapts to drift could stay accurate for months between clinical
+contacts, meaningfully reducing the care burden.
+Concretely: a patient who wakes up on a Thursday with a shifted neural code could still reach their
+prosthetic hand to make breakfast, without waiting for a Friday clinic appointment.
 
-### Prerequisites
+---
 
-- Authenticate with Hugging Face: The command will prompt for login if not already authenticated
+## Links
 
-### Options
+- **Training Notebook:** [TODO: Kaggle notebook URL — fill in after run completes]
+- **WandB Run:** [TODO: paste wandb run URL from training]
+- **HuggingFace Blog Post:** [TODO: HF blog post URL]
+- **Demo Video:** [TODO: YouTube demo URL]
+- **GitHub Repo:** https://github.com/Atrax-Lethare/neuro-rl
+- **HF Adapter:** https://huggingface.co/abhishekBiradar/neuro-rl-adapter
 
-- `--directory`, `-d`: Directory containing the OpenEnv environment (defaults to current directory)
-- `--repo-id`, `-r`: Repository ID in format 'username/repo-name' (defaults to 'username/env-name' from openenv.yaml)
-- `--base-image`, `-b`: Base Docker image to use (overrides Dockerfile FROM)
-- `--private`: Deploy the space as private (default: public)
+---
 
-### Examples
+## Citation
 
-```bash
-# Push to your personal namespace (defaults to username/env-name from openenv.yaml)
-openenv push
+If you use this environment or training setup, please cite the underlying frameworks:
 
-# Push to a specific repository
-openenv push --repo-id my-org/my-env
+```bibtex
+@software{openenv2025,
+  title   = {{OpenEnv}: An End-to-End Framework for Isolated RL Environments},
+  author  = {{Meta Platforms, Inc.}},
+  year    = {2025},
+  url     = {https://github.com/facebookresearch/openenv},
+}
 
-# Push with a custom base image
-openenv push --base-image ghcr.io/meta-pytorch/openenv-base:latest
+@software{trl2024,
+  title   = {{TRL}: Transformer Reinforcement Learning},
+  author  = {von Werra, Leandro and Tunstall, Lewis and Schmid, Philipp
+             and Beeching, Edward and Sileo, Damien and others},
+  year    = {2024},
+  url     = {https://github.com/huggingface/trl},
+}
 
-# Push as a private space
-openenv push --private
+@software{unsloth2024,
+  title   = {Unsloth: Fast LLM Fine-tuning},
+  author  = {Han, Daniel and Han, Michael},
+  year    = {2024},
+  url     = {https://github.com/unslothai/unsloth},
+}
 
-# Combine options
-openenv push --repo-id my-org/my-env --base-image custom-base:latest --private
-```
-
-After deployment, your space will be available at:
-`https://huggingface.co/spaces/<repo-id>`
-
-The deployed space includes:
-- **Web Interface** at `/web` - Interactive UI for exploring the environment
-- **API Documentation** at `/docs` - Full OpenAPI/Swagger interface
-- **Health Check** at `/health` - Container health monitoring
-- **WebSocket** at `/ws` - Persistent session endpoint for low-latency interactions
-
-## Environment Details
-
-### Action
-**NeuroRlAction**: Contains a single field
-- `message` (str) - The message to echo back
-
-### Observation
-**NeuroRlObservation**: Contains the echo response and metadata
-- `echoed_message` (str) - The message echoed back
-- `message_length` (int) - Length of the message
-- `reward` (float) - Reward based on message length (length × 0.1)
-- `done` (bool) - Always False for echo environment
-- `metadata` (dict) - Additional info like step count
-
-### Reward
-The reward is calculated as: `message_length × 0.1`
-- "Hi" → reward: 0.2
-- "Hello, World!" → reward: 1.3
-- Empty message → reward: 0.0
-
-## Advanced Usage
-
-### Connecting to an Existing Server
-
-If you already have a Neuro Rl Env environment server running, you can connect directly:
-
-```python
-from neuro_rl_env import NeuroRlEnv
-
-# Connect to existing server
-neuro_rl_envenv = NeuroRlEnv(base_url="<ENV_HTTP_URL_HERE>")
-
-# Use as normal
-result = neuro_rl_envenv.reset()
-result = neuro_rl_envenv.step(NeuroRlAction(message="Hello!"))
-```
-
-Note: When connecting to an existing server, `neuro_rl_envenv.close()` will NOT stop the server.
-
-### Using the Context Manager
-
-The client supports context manager usage for automatic connection management:
-
-```python
-from neuro_rl_env import NeuroRlAction, NeuroRlEnv
-
-# Connect with context manager (auto-connects and closes)
-with NeuroRlEnv(base_url="http://localhost:8000") as env:
-    result = env.reset()
-    print(f"Reset: {result.observation.echoed_message}")
-    # Multiple steps with low latency
-    for msg in ["Hello", "World", "!"]:
-        result = env.step(NeuroRlAction(message=msg))
-        print(f"Echoed: {result.observation.echoed_message}")
-```
-
-The client uses WebSocket connections for:
-- **Lower latency**: No HTTP connection overhead per request
-- **Persistent session**: Server maintains your environment state
-- **Efficient for episodes**: Better for many sequential steps
-
-### Concurrent WebSocket Sessions
-
-The server supports multiple concurrent WebSocket connections. To enable this,
-modify `server/app.py` to use factory mode:
-
-```python
-# In server/app.py - use factory mode for concurrent sessions
-app = create_app(
-    NeuroRlEnvironment,  # Pass class, not instance
-    NeuroRlAction,
-    NeuroRlObservation,
-    max_concurrent_envs=4,  # Allow 4 concurrent sessions
-)
-```
-
-Then multiple clients can connect simultaneously:
-
-```python
-from neuro_rl_env import NeuroRlAction, NeuroRlEnv
-from concurrent.futures import ThreadPoolExecutor
-
-def run_episode(client_id: int):
-    with NeuroRlEnv(base_url="http://localhost:8000") as env:
-        result = env.reset()
-        for i in range(10):
-            result = env.step(NeuroRlAction(message=f"Client {client_id}, step {i}"))
-        return client_id, result.observation.message_length
-
-# Run 4 episodes concurrently
-with ThreadPoolExecutor(max_workers=4) as executor:
-    results = list(executor.map(run_episode, range(4)))
-```
-
-## Development & Testing
-
-### Direct Environment Testing
-
-Test the environment logic directly without starting the HTTP server:
-
-```bash
-# From the server directory
-python3 server/neuro_rl_env_environment.py
-```
-
-This verifies that:
-- Environment resets correctly
-- Step executes actions properly
-- State tracking works
-- Rewards are calculated correctly
-
-### Running Locally
-
-Run the server locally for development:
-
-```bash
-uvicorn server.app:app --reload
-```
-
-## Project Structure
-
-```
-neuro_rl_env/
-├── .dockerignore         # Docker build exclusions
-├── __init__.py            # Module exports
-├── README.md              # This file
-├── openenv.yaml           # OpenEnv manifest
-├── pyproject.toml         # Project metadata and dependencies
-├── uv.lock                # Locked dependencies (generated)
-├── client.py              # NeuroRlEnv client
-├── models.py              # Action and Observation models
-└── server/
-    ├── __init__.py        # Server module exports
-    ├── neuro_rl_env_environment.py  # Core environment logic
-    ├── app.py             # FastAPI application (HTTP + WebSocket endpoints)
-    └── Dockerfile         # Container image definition
+@techreport{qwen32025,
+  title   = {{Qwen3} Technical Report},
+  author  = {{Qwen Team, Alibaba Cloud}},
+  year    = {2025},
+  url     = {https://huggingface.co/Qwen/Qwen3-1.7B-Instruct},
+}
 ```
